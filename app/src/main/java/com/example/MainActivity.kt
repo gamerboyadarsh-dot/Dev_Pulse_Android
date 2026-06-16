@@ -141,7 +141,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable("dashboard") { DashboardScreen(viewModel) }
+                        composable("dashboard") { 
+                            DashboardScreen(
+                                viewModel = viewModel,
+                                onProfileClick = { navController.navigate("profile") }
+                            ) 
+                        }
                         composable("projects") { ProjectsScreen(viewModel) }
                         composable("tasks") { TasksScreen(viewModel) }
                         composable("analytics") { AnalyticsScreen(viewModel) }

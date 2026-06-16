@@ -15,7 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [Project::class, Task::class, ActivityLog::class], version = 1, exportSchema = false)
+@Database(entities = [Project::class, Task::class, ActivityLog::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun taskDao(): TaskDao
@@ -32,42 +32,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "devpulse_database"
                 )
-                .addCallback(DatabaseCallback())
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance
             }
-        }
-    }
-
-    private class DatabaseCallback : Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            INSTANCE?.let { database ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    populateDatabase(database)
-                }
-            }
-        }
-
-        suspend fun populateDatabase(database: AppDatabase) {
-            val projectDao = database.projectDao()
-            val taskDao = database.taskDao()
-            val activityDao = database.activityDao()
-
-            val p1Id = projectDao.insertProject(Project(name = "DevPulse Android", description = "Productivity Hub", language = "Kotlin"))
-            val p2Id = projectDao.insertProject(Project(name = "Awesome Rust Tools", description = "CLI tools for devs", language = "Rust"))
-
-            taskDao.insertTask(Task(title = "Design DB Schema", projectId = p1Id, isCompleted = true, completedAt = System.currentTimeMillis() - 86400000))
-            taskDao.insertTask(Task(title = "Implement Room", projectId = p1Id, isCompleted = true, completedAt = System.currentTimeMillis() - 3600000))
-            taskDao.insertTask(Task(title = "Integrate GitHub API", projectId = p1Id))
-            taskDao.insertTask(Task(title = "Build Analytics Chart", projectId = p1Id))
-
-            taskDao.insertTask(Task(title = "Setup Cargo", projectId = p2Id, isCompleted = true))
-            taskDao.insertTask(Task(title = "Write memory safe struct", projectId = p2Id))
-
-            activityDao.insertActivity(ActivityLog(type = "Project Created", description = "Created project: DevPulse Android", projectId = p1Id, timestamp = System.currentTimeMillis() - 172800000))
-            activityDao.insertActivity(ActivityLog(type = "Task Completed", description = "Completed task: Implement Room", projectId = p1Id, timestamp = System.currentTimeMillis() - 3600000))
         }
     }
 }

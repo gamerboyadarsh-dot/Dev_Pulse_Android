@@ -81,6 +81,31 @@ class DevPulseViewModel(private val repository: DevPulseRepository, private val 
     )
 
 
+    fun updateProject(project: Project) {
+        viewModelScope.launch {
+            repository.updateProject(project)
+        }
+    }
+
+    fun toggleProjectCompletion(project: Project) {
+        viewModelScope.launch {
+            val completed = !project.isCompleted
+            repository.updateProject(
+                project.copy(
+                    isCompleted = completed,
+                    completedAt = if (completed) System.currentTimeMillis() else null,
+                    status = if (completed) "Completed" else "Active"
+                )
+            )
+        }
+    }
+
+    fun toggleProjectArchived(project: Project) {
+        viewModelScope.launch {
+            repository.updateProject(project.copy(isArchived = !project.isArchived))
+        }
+    }
+
     fun addProject(name: String, description: String, language: String) {
         viewModelScope.launch {
             repository.insertProject(Project(name = name, description = description, language = language))

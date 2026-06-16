@@ -10,5 +10,8 @@ data class Project(
     val description: String,
     val language: String,
     val status: String = "Active",
+    val isCompleted: Boolean = false,
+    val isArchived: Boolean = false,
+    val completedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

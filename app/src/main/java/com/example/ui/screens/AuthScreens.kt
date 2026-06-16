@@ -137,6 +137,41 @@ fun LoginScreen(viewModel: DevPulseViewModel, onLoginSuccess: () -> Unit, onNavi
             Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
         
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f))
+            Text("or", modifier = Modifier.padding(horizontal = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider(modifier = Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        OutlinedButton(
+            onClick = {
+                viewModel.login("Google User", "google@example.com")
+                onLoginSuccess()
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Continue with Google", color = MaterialTheme.colorScheme.onBackground)
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        OutlinedButton(
+            onClick = {
+                viewModel.login("GitHub User", "github@example.com")
+                onLoginSuccess()
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Continue with GitHub", color = MaterialTheme.colorScheme.onBackground)
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onNavigateToRegister) {
             Text("Don't have an account? Register")

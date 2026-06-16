@@ -32,7 +32,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun DashboardScreen(viewModel: DevPulseViewModel) {
+fun DashboardScreen(viewModel: DevPulseViewModel, onProfileClick: () -> Unit) {
     val userName by viewModel.userName.collectAsState()
     val projects by viewModel.projects.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
@@ -47,9 +47,13 @@ fun DashboardScreen(viewModel: DevPulseViewModel) {
         else -> "Expert"
     }
 
-    // Basic Insights Logic
-    val mostProductiveDay = "Tuesday" // Stubbed: In a real app we'd calculate from activityLog
-    val bestProject = if (projects.isNotEmpty()) projects.first().name else "Setup"
+    val completedTasksItems = tasks.filter { it.isCompleted && it.completedAt != null }
+    val dayFormat = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault())
+    val mostProductiveDay = if (completedTasksItems.isNotEmpty()) {
+        completedTasksItems.groupBy { dayFormat.format(java.util.Date(it.completedAt!!)) }
+            .maxByOrNull { it.value.size }?.key ?: "Tuesday"
+    } else "Tuesday"
+    val bestProject = if (projects.isNotEmpty()) projects.maxByOrNull { p -> tasks.count { it.projectId == p.id && it.isCompleted } }?.name ?: projects.first().name else "Setup"
     val insights = listOf(
         "You completed 38% more tasks this week! 🚀",
         "Your most productive day so far is $mostProductiveDay.",
@@ -70,7 +74,7 @@ fun DashboardScreen(viewModel: DevPulseViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable { onProfileClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(userName.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
@@ -136,6 +140,29 @@ fun DashboardScreen(viewModel: DevPulseViewModel) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 StatCard(modifier = Modifier.weight(1f), title = "Active Projects", value = "${projects.size}")
                 StatCard(modifier = Modifier.weight(1f), title = "Pending Tasks", value = "${tasks.size - completedTasks}")
+            }
+        }
+
+        val pendingTasks = tasks.filter { !it.isCompleted }.take(3)
+        if (pendingTasks.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Upcoming Tasks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 12.dp, start = 4.dp, end = 4.dp))
+                        pendingTasks.forEach { task ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Circle, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.secondary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(task.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -208,6 +235,10 @@ fun ProjectsScreen(viewModel: DevPulseViewModel) {
             }
         }
     ) { padding ->
+        val activeProjects = filteredProjects.filter { !it.isCompleted && !it.isArchived }
+        val completedProjects = filteredProjects.filter { it.isCompleted || it.isArchived }
+        val allTasks by viewModel.tasks.collectAsState()
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -227,40 +258,126 @@ fun ProjectsScreen(viewModel: DevPulseViewModel) {
                     singleLine = true
                 )
             }
-            if (filteredProjects.isEmpty()) {
+            
+            if (activeProjects.isNotEmpty()) {
+                item { Text("Active Projects", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary) }
+                items(activeProjects) { project ->
+                    ProjectCard(project, allTasks.filter { it.projectId == project.id }, viewModel)
+                }
+            }
+
+            if (completedProjects.isNotEmpty()) {
+                item { Text("Completed Projects", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.secondary) }
+                items(completedProjects) { project ->
+                    ProjectCard(project, allTasks.filter { it.projectId == project.id }, viewModel)
+                }
+            }
+
+            if (filteredProjects.isEmpty() && searchQuery.isNotEmpty()) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(Icons.Filled.FolderOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.SearchOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("No projects found", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            } else {
-                items(filteredProjects) { project ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(project.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            IconButton(onClick = { viewModel.deleteProject(project) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                        Text(project.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(project.language, style = MaterialTheme.typography.bodySmall)
-                        }
+            } else if (projects.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Filled.AutoAwesomeMotion, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Ready to start?", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Create your first project above.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProjectCard(project: com.example.data.model.Project, projectTasks: List<com.example.data.model.Task>, viewModel: DevPulseViewModel) {
+    val completedCount = projectTasks.count { it.isCompleted }
+    val totalCount = projectTasks.size
+    val progress = if (totalCount > 0) completedCount.toFloat() / totalCount.toFloat() else 0f
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = if (project.isCompleted) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (project.isCompleted) 0.dp else 2.dp),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(project.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (project.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                    Text(project.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Options")
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (project.isCompleted) "Reopen Project" else "Mark as Completed") },
+                            onClick = { 
+                                viewModel.toggleProjectCompletion(project)
+                                expanded = false
+                            },
+                            leadingIcon = { Icon(if (project.isCompleted) Icons.Filled.Undo else Icons.Filled.CheckCircle, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (project.isArchived) "Unarchive" else "Archive Project") },
+                            onClick = { 
+                                viewModel.toggleProjectArchived(project)
+                                expanded = false
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Archive, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Project", color = MaterialTheme.colorScheme.error) },
+                            onClick = { 
+                                viewModel.deleteProject(project)
+                                expanded = false
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primaryContainer
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(project.language, style = MaterialTheme.typography.bodySmall)
+                }
+                
+                if (project.isCompleted && project.completedAt != null) {
+                    val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                    Text("Completed: ${sdf.format(java.util.Date(project.completedAt))}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                } else {
+                    Text("$completedCount / $totalCount Tasks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -466,13 +583,17 @@ fun AnalyticsScreen(viewModel: DevPulseViewModel) {
                     Text("Contribution Heatmap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    val heatmapData = remember(tasks.hashCode()) {
-                        val cal = Calendar.getInstance()
+                    val heatmapData = remember(tasks.hashCode(), projects.hashCode()) {
                         val data = mutableListOf<Int>()
-                        for (i in 0 until 52) { // Roughly 52 blocks (for example, representing days backwards or something similar)
-                            // We can synthesize a real-looking heatmap from tasks
-                            val count = (0..3).random() // Stubbing for visual richness until real github API mapping is fully applied or task density grows
-                            data.add(count)
+                        val now = System.currentTimeMillis()
+                        // 52 blocks, representing 52 days ending today.
+                        val msInDay = 86400000L
+                        for (i in 51 downTo 0) {
+                            val startOfDay = now - (i * msInDay) - (now % msInDay)
+                            val endOfDay = startOfDay + msInDay
+                            val tasksCompleted = tasks.count { it.isCompleted && it.completedAt != null && it.completedAt >= startOfDay && it.completedAt < endOfDay }
+                            val projectsCompleted = projects.count { it.isCompleted && it.completedAt != null && it.completedAt >= startOfDay && it.completedAt < endOfDay }
+                            data.add(tasksCompleted + projectsCompleted)
                         }
                         data
                     }
@@ -672,6 +793,26 @@ fun ProfileScreen(viewModel: DevPulseViewModel, onLogout: () -> Unit) {
                         Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Export Productivity Report")
+                    }
+
+                    OutlinedButton(
+                        onClick = { /* Stub for Privacy options */ },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Filled.Security, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Privacy Settings")
+                    }
+
+                    OutlinedButton(
+                        onClick = { /* Stub for About */ },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Filled.Info, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("About DevPulse")
                     }
 
                     OutlinedButton(
