@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer circle or shield background for contrast, let's just make the dev pulse path -->
+    <path
+        android:fillColor="#38bdf8"
+        android:pathData="M 38.332031 36.636719 L 23.332031 51.636719 L 38.332031 66.636719 L 34.667969 70.363281 L 16 51.636719 L 34.667969 32.910156 Z M 69.667969 32.910156 L 88.333984 51.636719 L 69.667969 70.363281 L 66 66.636719 L 81 51.636719 L 66 36.636719 Z " />
+    
+    <!-- Center pulse -->
+    <path
+        android:fillColor="#818cf8"
+        android:pathData="M 40.597656 54 L 46 54 L 49 42 L 54.597656 68 L 59.597656 49.599609 L 63.597656 54 L 67 54 L 67 50 L 65.597656 50 L 61 45 L 54.402344 75 L 48.402344 48 L 46 58 L 39 58 Z " />
+</vector>

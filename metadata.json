@@ -1,0 +1,6 @@
+{
+  "name": "DevPulse",
+  "description": "A developer dashboard and tracking tool.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
