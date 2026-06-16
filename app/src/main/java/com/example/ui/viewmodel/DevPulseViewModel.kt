@@ -10,7 +10,51 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class DevPulseViewModel(private val repository: DevPulseRepository) : ViewModel() {
+import com.example.util.UserPreferences
+
+class DevPulseViewModel(private val repository: DevPulseRepository, private val userPrefs: UserPreferences) : ViewModel() {
+
+    val userName = userPrefs.userName.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ""
+    )
+    
+    val userEmail = userPrefs.userEmail.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ""
+    )
+    
+    val isLoggedIn = userPrefs.isLoggedIn.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
+    val themeMode = userPrefs.themeMode.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = "system"
+    )
+
+    fun login(name: String, email: String) {
+        viewModelScope.launch {
+            userPrefs.saveAuth(name, email)
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            userPrefs.clearAuth()
+        }
+    }
+
+    fun setTheme(mode: String) {
+        viewModelScope.launch {
+            userPrefs.saveTheme(mode)
+        }
+    }
 
     val projects = repository.allProjects.stateIn(
         scope = viewModelScope,
@@ -68,11 +112,11 @@ class DevPulseViewModel(private val repository: DevPulseRepository) : ViewModel(
     }
 }
 
-class DevPulseViewModelFactory(private val repository: DevPulseRepository) : ViewModelProvider.Factory {
+class DevPulseViewModelFactory(private val repository: DevPulseRepository, private val userPrefs: com.example.util.UserPreferences) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DevPulseViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return DevPulseViewModel(repository) as T
+            return DevPulseViewModel(repository, userPrefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

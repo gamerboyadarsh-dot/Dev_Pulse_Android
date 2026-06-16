@@ -41,37 +41,117 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.DevPulseViewModel
 import com.example.ui.viewmodel.DevPulseViewModelFactory
 import com.example.ui.screens.*
+import com.example.util.NotificationUtil
+
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Permission handled
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NotificationUtil.createNotificationChannel(this)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        
         enableEdgeToEdge()
         val app = application as DevPulseApp
-        setContent {
-            MyApplicationTheme {
+            val userPrefs = com.example.util.UserPreferences(this)
+            
+            setContent {
                 val viewModel: DevPulseViewModel = viewModel(
-                    factory = DevPulseViewModelFactory(app.repository)
+                    factory = DevPulseViewModelFactory(app.repository, userPrefs)
                 )
-                val navController = rememberNavController()
+                val themeMode by viewModel.themeMode.collectAsState()
+                val isDarkTheme = when (themeMode) {
+                    "light" -> false
+                    "dark" -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                MyApplicationTheme(darkTheme = isDarkTheme) {
+                    val navController = rememberNavController()
+                val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+                
+                // Get the current route to conditionally show bottom bar
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+                val showBottomBar = currentRoute !in listOf("splash", "login", "register")
+                
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    bottomBar = { DevPulseBottomBar(navController) }
+                    bottomBar = { if (showBottomBar) DevPulseBottomBar(navController) }
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = "dashboard",
+                        startDestination = "splash",
                         modifier = Modifier.padding(innerPadding),
                         enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(300)) },
                         exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(300)) },
                         popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(300)) },
                         popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(300)) },
                     ) {
+                        composable("splash") {
+                            SplashScreen(onNavigateToNext = {
+                                if (isLoggedIn) {
+                                    navController.navigate("dashboard") { 
+                                        popUpTo("splash") { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate("login") {
+                                        popUpTo("splash") { inclusive = true }
+                                    }
+                                }
+                            })
+                        }
+                        composable("login") {
+                            LoginScreen(
+                                viewModel = viewModel,
+                                onLoginSuccess = {
+                                    navController.navigate("dashboard") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                },
+                                onNavigateToRegister = {
+                                    navController.navigate("register")
+                                }
+                            )
+                        }
+                        composable("register") {
+                            RegisterScreen(
+                                viewModel = viewModel,
+                                onRegisterSuccess = {
+                                    navController.navigate("dashboard") {
+                                        popUpTo("register") { inclusive = true }
+                                    }
+                                },
+                                onNavigateToLogin = {
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
                         composable("dashboard") { DashboardScreen(viewModel) }
                         composable("projects") { ProjectsScreen(viewModel) }
                         composable("tasks") { TasksScreen(viewModel) }
                         composable("analytics") { AnalyticsScreen(viewModel) }
                         composable("github") { GitHubScreen() }
-                        composable("profile") { ProfileScreen() }
+                        composable("profile") { ProfileScreen(viewModel, onLogout = {
+                            viewModel.logout()
+                            navController.navigate("login") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }) }
                     }
                 }
             }
